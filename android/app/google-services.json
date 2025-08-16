@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "571656092171",
+    "project_id": "waterbottle-c9b31",
+    "storage_bucket": "waterbottle-c9b31.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:571656092171:android:54fdc65bae024c43a1250e",
+        "android_client_info": {
+          "package_name": "com.sujith.water_bottle"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_7AN0tie0G6HAgpz2t2GHI3JJiWEFBxw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
