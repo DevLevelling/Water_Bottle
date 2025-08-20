@@ -13,6 +13,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:water_bottle/config/supabase_config.dart';
 import 'firebase_options.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +37,16 @@ void main() async {
   } catch (e) {
     print('Error initializing Supabase: $e');
     // Continue with the app even if Supabase fails
+  }
+
+  // Ask for notifications permission (Android 13+ and iOS)
+  try {
+    final status = await Permission.notification.status;
+    if (!status.isGranted) {
+      await Permission.notification.request();
+    }
+  } catch (e) {
+    // Ignore permission errors
   }
 
   runApp(const WaterBottleApp());

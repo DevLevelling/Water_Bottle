@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>We use notifications to let you know when your posts are verified, rejected, or when friends post.</string>
 </dict>
 </plist>

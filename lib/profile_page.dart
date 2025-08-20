@@ -147,15 +147,15 @@ class _ProfilePageState extends State<ProfilePage> {
       // Get posts where user is the partner in Together mode
       final postsAsPartner = await client
           .from('water_fetch_posts')
-          .select('verification_status, fetch_type, partner_user_id')
+          .select('points, verification_status, fetch_type, partner_user_id')
           .eq('partner_user_id', _getDisplayName())
           .eq('fetch_type', 'Together');
 
       if (postsAsPartner != null) {
         for (final post in postsAsPartner) {
           if (post['verification_status'] == 'verified') {
-            // Partner gets 0.5 points for verified Together posts
-            totalPoints += 0.5;
+            // Partner gets the per-user points stored in the post (0.25 or 0.5)
+            totalPoints += (post['points'] ?? 0.0).toDouble();
             verifiedPosts++;
           }
         }

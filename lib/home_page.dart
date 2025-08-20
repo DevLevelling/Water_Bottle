@@ -73,6 +73,7 @@ class WaterActivity {
   final List<String> rejectedBy;
   final String? partnerUserName; // Partner user name for Together mode
   final String fetchType; // 'Single' or 'Together'
+  final String? ownerFirebaseUid; // Post owner's Firebase UID
 
   WaterActivity({
     this.id,
@@ -86,6 +87,7 @@ class WaterActivity {
     List<String>? rejectedBy,
     this.partnerUserName,
     this.fetchType = 'Single',
+    this.ownerFirebaseUid,
   }) : verificationStatus = verificationStatus ?? VerificationStatus.pending,
        verifiedBy = verifiedBy ?? const [],
        rejectedBy = rejectedBy ?? const [];
@@ -122,6 +124,7 @@ class _HomePageState extends State<HomePage> {
     'Single',
   ); // 'Single' or 'Together'
   final ValueNotifier<String> _selectedUser = ValueNotifier('Select users');
+  final ValueNotifier<int> _bottleCount = ValueNotifier(1);
 
   // Cache for performance
   bool _isModalOpen = false;
@@ -263,13 +266,12 @@ class _HomePageState extends State<HomePage> {
   // Calculate total points for a date group
   double _calculateTotalPoints(List<WaterActivity> activities) {
     return activities.fold(0.0, (sum, activity) {
-      // For Together mode posts, both users get 0.5 points each
-      // So the total points for the group should reflect this
-      if (activity.fetchType == 'Together' && activity.partnerUserName != null) {
-        // Each Together post contributes 1.0 total points (0.5 + 0.5)
-        return sum + 1.0;
+      if (activity.fetchType == 'Together' &&
+          activity.partnerUserName != null) {
+        // Total points across both users for a Together post
+        return sum + (activity.points * 2);
       } else {
-        // Single mode posts contribute their actual points
+        // Single mode posts contribute their per-user points
         return sum + activity.points;
       }
     });
@@ -282,22 +284,22 @@ class _HomePageState extends State<HomePage> {
       if (activity.verificationStatus != VerificationStatus.verified) {
         return sum;
       }
-      
+
       // Check if this user is involved in the activity
       bool isUserInvolved = false;
       double pointsToAdd = 0.0;
-      
+
       if (activity.name == userName) {
         // User is the poster
         isUserInvolved = true;
         pointsToAdd = activity.points;
-      } else if (activity.fetchType == 'Together' && 
-                 activity.partnerUserName == userName) {
+      } else if (activity.fetchType == 'Together' &&
+          activity.partnerUserName == userName) {
         // User is the partner in Together mode
         isUserInvolved = true;
-        pointsToAdd = 0.5; // Partner gets 0.5 points
+        pointsToAdd = activity.points; // Partner gets same per-user points
       }
-      
+
       return isUserInvolved ? sum + pointsToAdd : sum;
     });
   }
@@ -469,33 +471,47 @@ class _HomePageState extends State<HomePage> {
             rejectedBy: activity.rejectedBy,
             partnerUserName: activity.partnerUserName,
             fetchType: activity.fetchType,
+            ownerFirebaseUid: activity.ownerFirebaseUid,
           );
         });
       }
 
-      // Show success message with points info
+      // Show success message with dynamic points info
       if (mounted) {
-        if (activity.points == 1.0) {
-          // Single mode - user gets 1 point
+        if (activity.fetchType == 'Together' &&
+            activity.partnerUserName != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '✅ Verified! ${activity.name} gets 1.0 point for Single mode.',
+                '✅ Verified! ${activity.name} & ${activity.partnerUserName} both get ${activity.points} points each.',
               ),
               backgroundColor: Colors.green,
             ),
           );
-        } else if (activity.points == 0.5) {
-          // Together mode - both users get 0.5 points
-          final message =
-              activity.fetchType == 'Together' &&
-                      activity.partnerUserName != null
-                  ? '✅ Verified! ${activity.name} & ${activity.partnerUserName} both get 0.5 points for Together mode.'
-                  : '✅ Verified! Both users get 0.5 points for Together mode.';
+        } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message), backgroundColor: Colors.green),
+            SnackBar(
+              content: Text(
+                '✅ Verified! ${activity.name} gets ${activity.points} point${activity.points == 1.0 ? '' : 's'}.',
+              ),
+              backgroundColor: Colors.green,
+            ),
           );
         }
+      }
+
+      // Notify post owner about verification (non-blocking)
+      try {
+        final ownerUid = activity.ownerFirebaseUid;
+        if (ownerUid != null && ownerUid.isNotEmpty) {
+          await _notificationService.sendVerificationNotification(
+            postOwnerUid: ownerUid,
+            verifierName: currentUserName,
+            postMessage: activity.message,
+          );
+        }
+      } catch (e) {
+        print('Notification error (verify): $e');
       }
     } catch (e) {
       if (mounted) {
@@ -548,6 +564,7 @@ class _HomePageState extends State<HomePage> {
             rejectedBy: [...activity.rejectedBy, currentUserName],
             partnerUserName: activity.partnerUserName,
             fetchType: activity.fetchType,
+            ownerFirebaseUid: activity.ownerFirebaseUid,
           );
         });
       }
@@ -560,6 +577,20 @@ class _HomePageState extends State<HomePage> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+
+      // Notify post owner about rejection (non-blocking)
+      try {
+        final ownerUid = activity.ownerFirebaseUid;
+        if (ownerUid != null && ownerUid.isNotEmpty) {
+          await _notificationService.sendRejectionNotification(
+            postOwnerUid: ownerUid,
+            rejectorName: currentUserName,
+            postMessage: activity.message,
+          );
+        }
+      } catch (e) {
+        print('Notification error (reject): $e');
       }
     } catch (e) {
       if (mounted) {
@@ -839,6 +870,9 @@ class _HomePageState extends State<HomePage> {
       rejectedBy = const [];
     }
 
+    final currentUserName =
+        _authService.getCurrentUserProfile()?['displayName'] ?? 'Current User';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -1067,10 +1101,40 @@ class _HomePageState extends State<HomePage> {
               if (verifiedBy.isNotEmpty && rejectedBy.isNotEmpty)
                 const SizedBox(height: 8),
 
-              // Evaluation buttons for all activities (allow new users to evaluate)
-              // Only show if current user hasn't evaluated yet
-              if (!(activity.verifiedBy ?? const []).contains('Current User') &&
-                  !(activity.rejectedBy ?? const []).contains('Current User'))
+              // Owner cannot verify/reject own post; show only Delete for owner
+              if (activity.ownerFirebaseUid == _authService.currentUser?.uid)
+                activity.verificationStatus != VerificationStatus.verified
+                    ? GestureDetector(
+                      onTap: () => _confirmAndDeletePost(activity),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.delete, color: Colors.red, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              'Delete',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    : const SizedBox.shrink()
+              else if (!(activity.verifiedBy).contains(currentUserName) &&
+                  !(activity.rejectedBy).contains(currentUserName))
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1116,64 +1180,64 @@ class _HomePageState extends State<HomePage> {
                   ],
                 )
               else
-                // Show evaluation status for current user
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color:
-                        (activity.verifiedBy ?? const []).contains(
-                              'Current User',
-                            )
-                            ? Colors.green.withOpacity(0.1)
-                            : Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        (activity.verifiedBy ?? const []).contains(
-                              'Current User',
-                            )
-                            ? Icons.check
-                            : Icons.close,
-                        color:
-                            (activity.verifiedBy ?? const []).contains(
-                                  'Current User',
-                                )
-                                ? Colors.green
-                                : Colors.red,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        (activity.verifiedBy ?? const []).contains(
-                              'Current User',
-                            )
-                            ? 'You verified'
-                            : 'You rejected',
-                        style: TextStyle(
-                          color:
-                              (activity.verifiedBy ?? const []).contains(
-                                    'Current User',
-                                  )
-                                  ? Colors.green
-                                  : Colors.red,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                const SizedBox.shrink(),
             ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmAndDeletePost(WaterActivity activity) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Post'),
+          content: const Text('Are you sure you want to delete this post?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      if (activity.id != null) {
+        await _dataService.deleteWaterFetchPost(activity.id!);
+
+        setState(() {
+          _activities.removeWhere((a) => a.id == activity.id);
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Post deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting post: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildDateSection(String dateTitle, List<WaterActivity> activities) {
@@ -1219,11 +1283,10 @@ class _HomePageState extends State<HomePage> {
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     'Verified: ${activities.where((a) => a.verificationStatus == VerificationStatus.verified).fold(0.0, (sum, a) {
-                      // For Together mode posts, both users get 0.5 points each
                       if (a.fetchType == 'Together' && a.partnerUserName != null) {
-                        return sum + 1.0; // Total 1.0 points (0.5 + 0.5)
+                        return sum + (a.points * 2); // total across both users
                       } else {
-                        return sum + a.points; // Single mode posts
+                        return sum + a.points; // Single mode
                       }
                     })} pts',
                     style: const TextStyle(
@@ -1544,6 +1607,7 @@ class _HomePageState extends State<HomePage> {
 
     // Set default message
     _messageController.text = 'I have bought water';
+    _bottleCount.value = 1;
 
     showModalBottomSheet(
       context: context,
@@ -1925,6 +1989,137 @@ class _HomePageState extends State<HomePage> {
                             ],
                           ),
                         ),
+
+                        // Bottle count selector
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 4,
+                                  bottom: 8,
+                                ),
+                                child: Text(
+                                  'Bottles',
+                                  style: const TextStyle(
+                                    color: Color(0xFF111518),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0F3F4),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    ValueListenableBuilder<int>(
+                                      valueListenable: _bottleCount,
+                                      builder: (context, bottleCount, child) {
+                                        final bool isSelected =
+                                            bottleCount == 1;
+                                        return Expanded(
+                                          child: GestureDetector(
+                                            onTap: () => _bottleCount.value = 1,
+                                            child: Container(
+                                              height: 40,
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    isSelected
+                                                        ? Colors.white
+                                                        : Colors.transparent,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                boxShadow:
+                                                    isSelected
+                                                        ? const [
+                                                          BoxShadow(
+                                                            color: Color(
+                                                              0x1A000000,
+                                                            ),
+                                                            blurRadius: 4,
+                                                            offset: Offset(
+                                                              0,
+                                                              0,
+                                                            ),
+                                                          ),
+                                                        ]
+                                                        : null,
+                                              ),
+                                              child: const Center(
+                                                child: Text(
+                                                  '1 bottle',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF111518),
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    ValueListenableBuilder<int>(
+                                      valueListenable: _bottleCount,
+                                      builder: (context, bottleCount, child) {
+                                        final bool isSelected =
+                                            bottleCount == 2;
+                                        return Expanded(
+                                          child: GestureDetector(
+                                            onTap: () => _bottleCount.value = 2,
+                                            child: Container(
+                                              height: 40,
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    isSelected
+                                                        ? Colors.white
+                                                        : Colors.transparent,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                boxShadow:
+                                                    isSelected
+                                                        ? const [
+                                                          BoxShadow(
+                                                            color: Color(
+                                                              0x1A000000,
+                                                            ),
+                                                            blurRadius: 4,
+                                                            offset: Offset(
+                                                              0,
+                                                              0,
+                                                            ),
+                                                          ),
+                                                        ]
+                                                        : null,
+                                              ),
+                                              child: const Center(
+                                                child: Text(
+                                                  '2 bottles',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF111518),
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -2113,19 +2308,39 @@ class _HomePageState extends State<HomePage> {
         _isPosting = true;
       });
 
+      // Compute points based on bottle count and fetch type
+      final int bottles = _bottleCount.value;
+      final double basePoints = bottles == 1 ? 0.5 : 1.0;
+      double pointsPerUser;
+      if (_fetchType.value == 'Together') {
+        const int participants = 2; // poster + one partner
+        pointsPerUser = basePoints / participants; // 0.25 or 0.5
+      } else {
+        pointsPerUser = basePoints; // 0.5 or 1.0
+      }
+
+      // Capture values for notifications/messages before resetting
+      final String postedFetchType = _fetchType.value;
+      final String postedSelectedUser = _selectedUser.value;
+      final int postedBottles = _bottleCount.value;
+
       // Create post in Supabase
       await _dataService.createWaterFetchPost(
         message: _messageController.text.trim(),
-        fetchType: _fetchType.value,
+        fetchType: postedFetchType,
         partnerUserId:
-            _fetchType.value == 'Together' ? _selectedUser.value : null,
-        points: _fetchType.value == 'Together' ? 0.5 : 1.0,
+            postedFetchType == 'Together' ? postedSelectedUser : null,
+        points: pointsPerUser,
       );
+
+      // Cache message for notifications before resetting form
+      final String postedMessage = _messageController.text.trim();
 
       // Reset form
       _messageController.clear();
       _fetchType.value = 'Single';
       _selectedUser.value = 'Select users';
+      _bottleCount.value = 1;
 
       // Refresh data from Supabase
       await _loadDataFromSupabase();
@@ -2135,10 +2350,11 @@ class _HomePageState extends State<HomePage> {
         final currentUserProfile = _authService.getCurrentUserProfile();
         final currentUserName =
             currentUserProfile?['displayName'] ?? 'Unknown User';
-        final message = _messageController.text.trim();
-        final fetchType = _fetchType.value;
+        final message =
+            postedMessage.isEmpty ? 'I have bought water' : postedMessage;
+        final fetchType = postedFetchType;
         final partnerUserName =
-            fetchType == 'Together' ? _selectedUser.value : null;
+            fetchType == 'Together' ? postedSelectedUser : null;
 
         await _notificationService.sendPostCreationNotification(
           postOwnerName: currentUserName,
@@ -2158,18 +2374,16 @@ class _HomePageState extends State<HomePage> {
       Navigator.pop(context);
 
       // Show success message
-      final fetchType = _fetchType.value;
-      final selectedUser = _selectedUser.value;
-
+      final fetchType = postedFetchType;
+      final selectedUser = postedSelectedUser;
+      final int bottlesPosted = postedBottles;
+      final double basePts = bottlesPosted == 1 ? 0.5 : 1.0;
+      final String messageText =
+          fetchType == 'Together'
+              ? 'Posted as $selectedUser & ${_authService.getCurrentUserProfile()?['displayName'] ?? 'You'}! Both users will get ${(basePts / 2)} points each when verified.'
+              : 'Posted successfully! You will get ${basePts} points when verified.';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            fetchType == 'Together'
-                ? 'Posted as $selectedUser & ${_authService.getCurrentUserProfile()?['displayName'] ?? 'You'}! Both users will get 0.5 points each when verified.'
-                : 'Posted successfully! You will get 1.0 points when verified.',
-          ),
-          backgroundColor: Colors.green,
-        ),
+        SnackBar(content: Text(messageText), backgroundColor: Colors.green),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

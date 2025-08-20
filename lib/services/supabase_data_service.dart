@@ -140,6 +140,7 @@ class SupabaseDataService {
             rejectedBy: List<String>.from(post['rejected_by'] ?? []),
             partnerUserName: partnerUserName,
             fetchType: post['fetch_type'] ?? 'Single',
+            ownerFirebaseUid: post['firebase_uid'] as String?,
           ),
         );
       }
@@ -260,6 +261,16 @@ class SupabaseDataService {
           .eq('id', postId);
     } catch (e) {
       print('Error rejecting post: $e');
+      rethrow;
+    }
+  }
+
+  // Delete a water fetch post by ID
+  Future<void> deleteWaterFetchPost(String postId) async {
+    try {
+      await _client.from('water_fetch_posts').delete().eq('id', postId);
+    } catch (e) {
+      print('Error deleting post: $e');
       rethrow;
     }
   }

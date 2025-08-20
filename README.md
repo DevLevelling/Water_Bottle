@@ -12,15 +12,18 @@ A Flutter-based mobile application that helps users track their water fetching a
 - **Secure logout** functionality
 
 ### 💧 Water Fetching Activities
-- **Single Mode**: Individual water fetching (1.0 points)
-- **Together Mode**: Collaborative water fetching (0.5 points each)
+- **Single Mode**: Individual water fetching with bottle selection (1 bottle = 0.5 pts, 2 bottles = 1.0 pt)
+- **Together Mode**: Collaborative fetching with fair split (1 bottle = 0.25 pts each, 2 bottles = 0.5 pts each)
+- **Bottle selector**: Choose 1 or 2 bottles per post
 - **Real-time posting** with custom messages
 - **User selection** for collaborative activities
+- **Owner delete**: Post owners can delete their post until it’s verified
 - **Activity history** with timestamps
 
 ### 🏆 Points & Verification System
-- **Point-based scoring** system
+- **Point-based scoring** with per-user points stored on each post
 - **Verification status** (pending, verified, rejected)
+- **Decision locking**: once you verify or reject a post, you cannot change it
 - **Leaderboard rankings** based on total points
 - **User profiles** with point summaries
 - **Activity verification** workflow
@@ -164,21 +167,64 @@ lib/
 3. **Start tracking** - Post your first water fetching activity
 
 ### Creating Activities
-1. **Choose mode**: Single (1.0 points) or Together (0.5 points each)
-2. **For Together mode**: Select a partner from the dropdown
-3. **Write a message** describing your activity
-4. **Post activity** - It will appear in your feed
+1. **Choose mode**: Single or Together
+2. **Choose bottles**: 1 bottle or 2 bottles (affects points)
+3. **For Together mode**: Select a partner from the dropdown
+4. **Write a message** describing your activity
+5. **Post activity** - It will appear in your feed
 
 ### Understanding Points
-- **Single Mode**: You get 1.0 points when verified
-- **Together Mode**: Both you and your partner get 0.5 points each
-- **Total points**: Sum of all verified activities
+- **Single Mode**: 1 bottle → 0.5 points; 2 bottles → 1.0 point
+- **Together Mode**: 1 bottle → 0.25 points each; 2 bottles → 0.5 points each
+- **Totals**: Together total = per-user points × 2 (poster + partner)
 - **Verification**: Activities start as "pending" until verified
+- **Owner delete**: You can delete your own post until it’s verified
+- **Decision locking**: After you verify/reject a post, your decision is locked
 
 ### Navigation
 - **Home Tab**: View and create activities
 - **Leaderboard Tab**: See user rankings
 - **Profile Tab**: View your stats and logout
+
+## 🔄 Process & Working Method
+
+### End-to-end flow
+- **Post creation**
+  - Choose mode (Single/Together), pick bottles (1 or 2), write a message, and for Together select a partner.
+  - The app computes per-user points and saves a post in Supabase with these values:
+    - Single: 1 bottle → 0.5, 2 bottles → 1.0
+    - Together: 1 bottle → 0.25 each, 2 bottles → 0.5 each
+  - Fields stored: `message`, `fetch_type`, `partner_user_id` (partner display name), `points` (per-user), `firebase_uid` (owner), `verification_status`, `verified_by`, `rejected_by`.
+  - A notification is sent to all other users announcing the new post.
+
+- **Home feed & actions**
+  - Each post shows status (pending/verified/rejected), message, and points. Together posts show “points each”.
+  - The post owner never sees verify/reject; they see a Delete button (only while the post is not verified).
+  - Other users can verify or reject exactly once; after deciding, the controls are hidden for them (decision locking).
+
+- **Verification / Rejection**
+  - Verify updates Supabase: sets `verification_status` to `verified`, adds the verifier to `verified_by`, removes them from `rejected_by` if present, and notifies the owner.
+  - Reject updates Supabase similarly (`rejected_by`) and notifies the owner.
+
+- **Points aggregation**
+  - The `points` column stores per-user points for the post.
+  - Leaderboard/Profile totals:
+    - For posts you created (poster): sum your posts’ `points` where `verification_status = verified`.
+    - For Together posts where you are the partner: sum the post `points` (also per-user) where `partner_user_id = your name` and `verification_status = verified`.
+  - Daily totals shown in the UI treat Together posts as `points * 2` to reflect both users’ contributions.
+
+- **Delete behavior**
+  - Owners can delete their own posts until the post is verified. Deleting removes the row from Supabase and the item from the feed.
+
+- **Notifications & permissions**
+  - The app requests notification permission at startup (Android 13+ and iOS) using `permission_handler`.
+  - Android uses `POST_NOTIFICATIONS`. iOS includes `NSUserNotificationUsageDescription` in `Info.plist`.
+  - Notifications are created in the `notifications` table and fetched per user.
+
+### Data model guarantees
+- Per-user points are stored directly on each post (`water_fetch_posts.points`).
+- Together posts store the partner’s display name in `partner_user_id` for easy partner lookup.
+- Row Level Security (RLS) ensures users can only insert/update their own data.
 
 ## 🛠️ Development
 
@@ -233,7 +279,9 @@ flutter test --coverage
 - `message`: Activity description
 - `fetch_type`: 'Single' or 'Together'
 - `partner_user_id`: Partner's display name (for Together mode)
-- `points`: Points awarded (0.5 for Together, 1.0 for Single)
+- `points`: Per-user points stored for the post
+  - Single: 0.5 (1 bottle) or 1.0 (2 bottles)
+  - Together: 0.25 (1 bottle) or 0.5 (2 bottles) per user
 - `verification_status`: 'pending', 'verified', or 'rejected'
 - `verified_by`: Array of user IDs who verified
 - `rejected_by`: Array of user IDs who rejected
