@@ -4,16 +4,16 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-/// Default [FirebaseOptions] for use with your Firebase apps.
+/// Default Firebase options that read values from compile-time environment.
 ///
-/// Example:
-/// ```dart
-/// import 'firebase_options.dart';
-/// // ...
-/// await Firebase.initializeApp(
-///   options: DefaultFirebaseOptions.currentPlatform,
-/// );
-/// ```
+/// Provide values via --dart-define when running or building, for example:
+///   flutter run \
+///     --dart-define=FIREBASE_API_KEY=... \
+///     --dart-define=FIREBASE_APP_ID=... \
+///     --dart-define=FIREBASE_MESSAGING_SENDER_ID=... \
+///     --dart-define=FIREBASE_PROJECT_ID=... \
+///     --dart-define=FIREBASE_STORAGE_BUCKET=... \
+///     --dart-define=FIREBASE_AUTH_DOMAIN=...
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -30,8 +30,7 @@ class DefaultFirebaseOptions {
         return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
+          'DefaultFirebaseOptions have not been configured for linux - please provide --dart-define values.',
         );
       default:
         throw UnsupportedError(
@@ -41,44 +40,47 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyB_7AN0tie0G6HAgpz2t2GHI3JJiWEFBxw',
-    appId: '1:571656092171:android:54fdc65bae024c43a1250e',
-    messagingSenderId: '571656092171',
-    projectId: 'waterbottle-c9b31',
-    storageBucket: 'waterbottle-c9b31.firebasestorage.app',
-    authDomain: 'waterbottle-c9b31.firebaseapp.com',
+    apiKey: String.fromEnvironment('FIREBASE_API_KEY', defaultValue: ''),
+    appId: String.fromEnvironment('FIREBASE_APP_ID', defaultValue: ''),
+    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID', defaultValue: ''),
+    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: ''),
+    storageBucket: String.fromEnvironment('FIREBASE_STORAGE_BUCKET', defaultValue: ''),
+    authDomain: String.fromEnvironment('FIREBASE_AUTH_DOMAIN', defaultValue: ''),
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyB_7AN0tie0G6HAgpz2t2GHI3JJiWEFBxw',
-    appId: '1:571656092171:android:54fdc65bae024c43a1250e',
-    messagingSenderId: '571656092171',
-    projectId: 'waterbottle-c9b31',
-    storageBucket: 'waterbottle-c9b31.firebasestorage.app',
+    apiKey: String.fromEnvironment('FIREBASE_API_KEY', defaultValue: ''),
+    appId: String.fromEnvironment('FIREBASE_APP_ID', defaultValue: ''),
+    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID', defaultValue: ''),
+    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: ''),
+    storageBucket: String.fromEnvironment('FIREBASE_STORAGE_BUCKET', defaultValue: ''),
+    authDomain: String.fromEnvironment('FIREBASE_AUTH_DOMAIN', defaultValue: ''),
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyB_7AN0tie0G6HAgpz2t2GHI3JJiWEFBxw',
-    appId: '1:571656092171:android:54fdc65bae024c43a1250e',
-    messagingSenderId: '571656092171',
-    projectId: 'waterbottle-c9b31',
-    storageBucket: 'waterbottle-c9b31.firebasestorage.app',
+    apiKey: String.fromEnvironment('FIREBASE_API_KEY', defaultValue: ''),
+    appId: String.fromEnvironment('FIREBASE_APP_ID', defaultValue: ''),
+    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID', defaultValue: ''),
+    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: ''),
+    storageBucket: String.fromEnvironment('FIREBASE_STORAGE_BUCKET', defaultValue: ''),
+    authDomain: String.fromEnvironment('FIREBASE_AUTH_DOMAIN', defaultValue: ''),
   );
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyB_7AN0tie0G6HAgpz2t2GHI3JJiWEFBxw',
-    appId: '1:571656092171:android:54fdc65bae024c43a1250e',
-    messagingSenderId: '571656092171',
-    projectId: 'waterbottle-c9b31',
-    storageBucket: 'waterbottle-c9b31.firebasestorage.app',
-    authDomain: 'waterbottle-c9b31.firebaseapp.com',
+    apiKey: String.fromEnvironment('FIREBASE_API_KEY', defaultValue: ''),
+    appId: String.fromEnvironment('FIREBASE_APP_ID', defaultValue: ''),
+    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID', defaultValue: ''),
+    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: ''),
+    storageBucket: String.fromEnvironment('FIREBASE_STORAGE_BUCKET', defaultValue: ''),
+    authDomain: String.fromEnvironment('FIREBASE_AUTH_DOMAIN', defaultValue: ''),
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyB_7AN0tie0G6HAgpz2t2GHI3JJiWEFBxw',
-    appId: '1:571656092171:android:54fdc65bae024c43a1250e',
-    messagingSenderId: '571656092171',
-    projectId: 'waterbottle-c9b31',
-    storageBucket: 'waterbottle-c9b31.firebasestorage.app',
+    apiKey: String.fromEnvironment('FIREBASE_API_KEY', defaultValue: ''),
+    appId: String.fromEnvironment('FIREBASE_APP_ID', defaultValue: ''),
+    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID', defaultValue: ''),
+    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: ''),
+    storageBucket: String.fromEnvironment('FIREBASE_STORAGE_BUCKET', defaultValue: ''),
+    authDomain: String.fromEnvironment('FIREBASE_AUTH_DOMAIN', defaultValue: ''),
   );
 }
