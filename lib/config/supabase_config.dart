@@ -1,8 +1,13 @@
+/// Supabase configuration that reads values from compile-time environment.
+///
+/// Provide values via --dart-define when running or building, for example:
+///   flutter run \
+///     --dart-define=SUPABASE_URL=... \
+///     --dart-define=SUPABASE_ANON_KEY=...
 class SupabaseConfig {
-  // Supabase project credentials
-  static const String url = 'https://pgptmxptluuitaqkmrmb.supabase.co';
-  static const String anonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncHRteHB0bHV1aXRhcWttcm1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTAxOTYsImV4cCI6MjA3MDg2NjE5Nn0.V4mqYRGx3_Rt_DD5J7cRp7moS-J9Qc2UTI-xy9O88S0';
+  // Supabase project credentials from environment
+  static const String url = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+  static const String anonKey = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
 
   // Configuration options
   static const bool enableDebug = false;
