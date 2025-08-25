@@ -100,14 +100,40 @@ lib/
     └── notification_service.dart     # Push notifications
 ```
 
-## 🔧 Configuration
+## 🔧 Configuration (Firebase & Supabase)
+
+**⚠️ Security Note:** This repository no longer commits Firebase credentials or config files for security reasons. All credentials must be provided at build/run time.
 
 ### Firebase Setup
 1. Create a new Firebase project
 2. Enable Authentication with Email/Password
 3. Enable reCAPTCHA Enterprise
-4. Download `google-services.json`
+4. Download `google-services.json` (keep it local, do not commit to repo)
 5. Add SHA-1 fingerprint for your app
+
+**For development/building, provide Firebase configuration via Dart defines:**
+
+```bash
+flutter run \
+  --dart-define=FIREBASE_API_KEY=your_api_key_here \
+  --dart-define=FIREBASE_APP_ID=your_app_id_here \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=your_sender_id_here \
+  --dart-define=FIREBASE_PROJECT_ID=your_project_id \
+  --dart-define=FIREBASE_STORAGE_BUCKET=your_storage_bucket \
+  --dart-define=FIREBASE_AUTH_DOMAIN=your_auth_domain
+```
+
+**For release builds:**
+
+```bash
+flutter build apk \
+  --dart-define=FIREBASE_API_KEY=your_api_key_here \
+  --dart-define=FIREBASE_APP_ID=your_app_id_here \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=your_sender_id_here \
+  --dart-define=FIREBASE_PROJECT_ID=your_project_id \
+  --dart-define=FIREBASE_STORAGE_BUCKET=your_storage_bucket \
+  --dart-define=FIREBASE_AUTH_DOMAIN=your_auth_domain
+```
 
 ### Supabase Setup
 1. Create a new Supabase project
@@ -158,6 +184,31 @@ lib/
    CREATE POLICY "Users can insert own posts" ON water_fetch_posts
      FOR INSERT WITH CHECK (auth.uid()::text = firebase_uid);
    ```
+
+**For development/building, also provide Supabase configuration via Dart defines:**
+
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=your_supabase_url \
+  --dart-define=SUPABASE_ANON_KEY=your_anon_key \
+  --dart-define=FIREBASE_API_KEY=your_api_key_here \
+  --dart-define=FIREBASE_APP_ID=your_app_id_here \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=your_sender_id_here \
+  --dart-define=FIREBASE_PROJECT_ID=your_project_id \
+  --dart-define=FIREBASE_STORAGE_BUCKET=your_storage_bucket \
+  --dart-define=FIREBASE_AUTH_DOMAIN=your_auth_domain
+```
+
+### Platform-Specific Configuration
+
+**Android:** Do not commit `android/app/google-services.json`. Instead, keep a local copy or use CI to place it during builds. An example template is provided as `google-services.json.example`.
+
+**iOS/macOS:** Do not commit `GoogleService-Info.plist`. Keep a local copy or inject during CI. You may create `GoogleService-Info.plist.example` similarly.
+
+### Security Recommendations
+- **Rotate any keys** that were previously committed, as they should be considered compromised.
+- Enable GitHub secret scanning and push protection in repository settings.
+- Use environment variables or CI/CD secrets for production deployments.
 
 ## 📱 Usage Guide
 
